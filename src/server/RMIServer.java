@@ -31,17 +31,8 @@ public class RMIServer extends AnAbstractSimulationParametersBean {
             String host = ServerArgsProcessor.getRegistryHost(args);
             Registry rmiRegistry = LocateRegistry.getRegistry(RegistryArgsProcessor.getRegistryPort(args));
             RMIRegistryLocated.newCase(this, host, registryPort, rmiRegistry);
-            String objectName = "RELAYER";
 
-
-
-            Relayer relayer = new ADistributedRelayer();
-
-            UnicastRemoteObject.exportObject((DistributedRelayer) relayer,0); //create proxy -> same object instead of a copy sent
-
-
-            RMIObjectRegistered.newCase(this, objectName, relayer, rmiRegistry);
-            rmiRegistry.rebind(objectName, (DistributedRelayer) relayer);
+            //Server proxy create -> Add to the registry to be later reetrieved
 
         } catch (RemoteException e) {
             throw new RuntimeException(e);
