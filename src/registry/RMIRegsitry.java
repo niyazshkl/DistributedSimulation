@@ -5,6 +5,8 @@ import assignments.util.mainArgs.RegistryArgsProcessor;
 import coupledsims.AStandAloneTwoCoupledHalloweenSimulations;
 import graphics.AHalloweenSimulation;
 import stringProcessors.AHalloweenCommandProcessor;
+import util.annotations.Tags;
+import util.tags.DistributedTags;
 import util.trace.factories.FactoryTraceUtility;
 import util.trace.misc.ThreadDelayed;
 import util.trace.port.PortTraceUtility;
@@ -16,7 +18,7 @@ import util.trace.port.rpc.rmi.RMITraceUtility;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.util.Scanner;
-
+@Tags({DistributedTags.REGISTRY, DistributedTags.RMI})
 public class RMIRegsitry extends AnAbstractSimulationParametersBean {
     public static void main(String[] args){
         new RMIRegsitry().createRegistry(args);

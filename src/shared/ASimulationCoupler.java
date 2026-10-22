@@ -1,11 +1,10 @@
-package common;
+package shared;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 
 import stringProcessors.HalloweenCommandProcessor;
 import util.trace.trickOrTreat.LocalCommandObserved;
-import veto.PropertyChangeVetoer;
 
 public class ASimulationCoupler implements PropertyChangeListener {
     HalloweenCommandProcessor observingSimulation;

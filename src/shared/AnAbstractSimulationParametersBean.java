@@ -1,4 +1,4 @@
-package common;
+package shared;
 
 import assignments.util.inputParameters.SimulationParametersBean;
 import util.interactiveMethodInvocation.ConsensusAlgorithm;

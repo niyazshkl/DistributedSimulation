@@ -1,4 +1,4 @@
-package common.consensus;
+package shared.traces;
 
 import util.annotations.ComponentWidth;
 import util.annotations.DisplayToString;

@@ -1,9 +1,9 @@
-package common;
+package shared;
+import shared.traces.ProposedStateSet;
 import graphics.HalloweenSimulation;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.io.Serializable;
 import java.util.Vector;
 
 import stringProcessors.*;
@@ -24,7 +24,7 @@ import util.trace.trickOrTreat.ConnectedToSimulation;
 import veto.PropertyChangeVetoer;
 @StructurePattern(StructurePatternNames.BEAN_PATTERN)
 
-public class AHalloweenCommandProcessor implements HalloweenCommandProcessor, Serializable
+public class AHalloweenCommandProcessor implements HalloweenCommandProcessor, DistributedCommandProcessor
 {
     public static final boolean RESET_COMMAND = false;
 
@@ -106,6 +106,7 @@ public class AHalloweenCommandProcessor implements HalloweenCommandProcessor, Se
     {
         return inputString;
     }
+
 
     @Override
     @Position (1)
@@ -515,6 +516,7 @@ public class AHalloweenCommandProcessor implements HalloweenCommandProcessor, Se
 
         if (checkWithAllVetoers(inputEvent)) {
             if (isConnectedToSimulation()) {
+                System.out.println("CHECK WITH ALL VETORERS!! & ConnectedTosimulation!");
                 processCommand(newVal); // changes inputString
             }
             NotifiedPropertyChangeEvent.newCase(this, inputEvent, listeners.toArray(emptyPropertyChangeListenerArray));
@@ -535,6 +537,7 @@ public class AHalloweenCommandProcessor implements HalloweenCommandProcessor, Se
     public void processCommand(String newInputString)
     {
         CommandSubmitted.newCase(this, newInputString);
+        ProposedStateSet.newCase(this, this.toString(), -1, newInputString);
         inputString = newInputString;
         if (MyHalloweenSim == null)
             return;
