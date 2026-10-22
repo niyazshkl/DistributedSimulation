@@ -1,22 +1,15 @@
 package server;
 
-import assignments.util.inputParameters.AnAbstractSimulationParametersBean;
-import assignments.util.mainArgs.RegistryArgsProcessor;
 import assignments.util.mainArgs.ServerArgsProcessor;
 
 import client.DistributedCoupler;
-import shared.traces.ProposalLearnedNotificationSent;
+import shared.Constants;
+import util.trace.port.consensus.ProposalLearnedNotificationSent;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
-import util.trace.factories.FactoryTraceUtility;
-import util.trace.misc.ThreadDelayed;
-import util.trace.port.PortTraceUtility;
-import util.trace.port.consensus.ConsensusTraceUtility;
 import util.trace.port.consensus.ProposalMade;
-import util.trace.port.nio.NIOTraceUtility;
 import util.trace.port.rpc.rmi.RMIObjectRegistered;
 import util.trace.port.rpc.rmi.RMIRegistryLocated;
-import util.trace.port.rpc.rmi.RMITraceUtility;
 
 import java.beans.PropertyChangeEvent;
 import java.rmi.RemoteException;
@@ -26,47 +19,63 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.HashMap;
 import java.util.Map;
 @Tags({DistributedTags.SERVER_CONFIGURER, DistributedTags.RMI})
-public class RMIServer extends AnAbstractSimulationParametersBean {
-    public Map<String, DistributedCoupler> getClients() {
-        return clients;
-    }
+public class RMIServer extends Constants implements Server{
 
     private Map<String, DistributedCoupler> clients;
     private Relayer relayer;
+    private String host;
+    private int port;
 
     public RMIServer() {
+        super();
         this.clients = new HashMap<>();
         this.relayer = new RelayerProxy(this);
     }
 
-    public static void main(String[] args){
-       RMIServer rmiServer = new RMIServer();
-       rmiServer.setTracing();
-       rmiServer.startServer(args);
+    public void setHost(String host) {
+        this.host = host;
     }
 
-    public void startServer(String[] args){
+    public void setPort(int port) {
+        this.port = port;
+    }
+    @Override
+    public void launchServer(String[] args){
+        String host = ServerArgsProcessor.getRegistryHost(args);
+        int port = ServerArgsProcessor.getRegistryPort(args);
+
+        info(host, port);
+
+        RMIServer rmiServer = new RMIServer();
+
+        rmiServer.setHost(host);
+        rmiServer.setPort(port);
+        rmiServer.registerRemoteObject(args);
+    }
+
+    private void info(String host, int port) {
+        System.out.println("RMIServer: Registry Host: " + host);
+        System.out.println("RMIServer: Registry Port: " + port);
+    }
+
+    public void registerRemoteObject(String[] args){
         try {
+            Registry rmiRegistry = LocateRegistry.getRegistry(port);
 
-            int registryPort = ServerArgsProcessor.getRegistryPort(args);
-            String host = ServerArgsProcessor.getRegistryHost(args);
+            RMIRegistryLocated.newCase(this, host, port, rmiRegistry);
 
-            Registry rmiRegistry = LocateRegistry.getRegistry(RegistryArgsProcessor.getRegistryPort(args));
-
-            RMIRegistryLocated.newCase(this, host, registryPort, rmiRegistry);
-
-            //Server proxy create -> Add to the registry to be later reetrieved
-
-            DistributedRelayer stub =
+            DistributedRelayer proxy =
                     (DistributedRelayer) UnicastRemoteObject.exportObject(
                             (DistributedRelayer) relayer, 0
                     );
 
             rmiRegistry.rebind(
-                    "RELAYER",
-                    stub
+                    Constants.RMI_RELAYER,
+                    proxy
             );
-            RMIObjectRegistered.newCase(this,"RELAYER", -1, rmiRegistry);
+
+            RMIObjectRegistered.newCase(this, Constants.RMI_RELAYER, -1, rmiRegistry);
+
         } catch (RemoteException e) {
             throw new RuntimeException(e);
         }
@@ -75,7 +84,7 @@ public class RMIServer extends AnAbstractSimulationParametersBean {
     public void broadcast(String senderName, PropertyChangeEvent event) {
 
         ProposalMade.newCase(this, senderName, -1, event);
-        for (Map.Entry<String, DistributedCoupler> entry : this.getClients().entrySet()) {
+        for (Map.Entry<String, DistributedCoupler> entry : this.clients.entrySet()) {
             if (!entry.getKey().equals(senderName)) {
                 ProposalLearnedNotificationSent.newCase(this, entry.getKey(), -1, event);
                 try {
@@ -86,13 +95,9 @@ public class RMIServer extends AnAbstractSimulationParametersBean {
             }
         }
     }
-    protected void setTracing() {
-        PortTraceUtility.setTracing();
-        RMITraceUtility.setTracing();
-        NIOTraceUtility.setTracing();
-        FactoryTraceUtility.setTracing();
-        ConsensusTraceUtility.setTracing();
-        ThreadDelayed.enablePrint();
-        this.trace(true);
+
+    public void addClient(String name, DistributedCoupler inCoupler){
+        this.clients.put(name, inCoupler); //overwrites previous incoupler of a client
     }
+
 }

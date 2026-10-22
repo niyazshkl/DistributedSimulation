@@ -1,4 +1,4 @@
-package shared;
+package client.modifiedStarter;
 
 import java.beans.PropertyChangeListener;
 import java.io.Serializable;

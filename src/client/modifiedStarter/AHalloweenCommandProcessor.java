@@ -1,5 +1,5 @@
-package shared;
-import shared.traces.ProposedStateSet;
+package client.modifiedStarter;
+
 import graphics.HalloweenSimulation;
 
 import java.beans.PropertyChangeEvent;
@@ -19,6 +19,7 @@ import util.trace.bean.AddedPropertyChangeListener;
 import util.trace.bean.NotifiedPropertyChangeEvent;
 import util.trace.bean.RemovedPropertyChangeListener;
 import util.trace.bean.SetProperty;
+import util.trace.port.consensus.ProposedStateSet;
 import util.trace.trickOrTreat.CommandSubmitted;
 import util.trace.trickOrTreat.ConnectedToSimulation;
 import veto.PropertyChangeVetoer;

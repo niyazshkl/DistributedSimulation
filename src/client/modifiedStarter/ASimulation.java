@@ -1,51 +1,40 @@
-package client;
+package client.modifiedStarter;
 
 import assignments.util.inputParameters.AnAbstractSimulationParametersBean;
 import assignments.util.inputParameters.SimulationParametersListener;
-import assignments.util.mainArgs.ClientArgsProcessor;
-import shared.AHalloweenCommandProcessor;
-import shared.DistributedCommandProcessor;
+import client.Client;
+import client.Coupler;
 import graphics.HalloweenSimulation;
 import main.BeauAndersonFinalProject;
 import stringProcessors.HalloweenCommandProcessor;
 import util.misc.ThreadSupport;
 import util.trace.Tracer;
-import util.trace.factories.FactoryTraceUtility;
-import util.trace.misc.ThreadDelayed;
 import util.trace.port.PerformanceExperimentEnded;
 import util.trace.port.PerformanceExperimentStarted;
-import util.trace.port.PortTraceUtility;
-import util.trace.port.consensus.ConsensusTraceUtility;
-import util.trace.port.nio.NIOTraceUtility;
-import util.trace.port.rpc.rmi.RMITraceUtility;
 
 import java.beans.PropertyChangeListener;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 
 
 public class ASimulation extends AnAbstractSimulationParametersBean implements SimulationParametersListener {
-    private final String clientName;
+    private final Client client;
     HalloweenCommandProcessor commandProcessor;
-    HalloweenCommandProcessor commandProcessor2;
     protected int NUM_EXPERIMENT_COMMANDS = 500;
-    public static final String EXPERIMENT_COMMAND_1 = "move 1 -1";
-    public static final String EXPERIMENT_COMMAND_2 = "undo";
     protected PropertyChangeListener outCoupler;
-    protected DistributedCoupler inCoupler;
+    protected Coupler inCoupler;
 
-    public DistributedCoupler getInCoupler() {
+    public void setInCoupler(Coupler inCoupler) {
+        this.inCoupler = inCoupler;
+        this.inCoupler.setObservingProcessor((DistributedCommandProcessor) this.commandProcessor); //waits for outCoupler notify
+    }
+
+    public Coupler getInCoupler() {
         return inCoupler;
     }
 
-    Map<String, List<Integer>> simulationValues = new HashMap<>();
-
     public static boolean isFirst = true;
 
-    public ASimulation(String clientName) {
-        this.clientName = clientName;
+    public ASimulation(Client client) {
+        this.client = client;
         this.init();
     }
     public HalloweenCommandProcessor createSimulation(String titlePrefix, int simulationX, int simulationY, int simulationWidth, int simulationHeight, int commandX, int commandY) {
@@ -63,43 +52,21 @@ public class ASimulation extends AnAbstractSimulationParametersBean implements S
         return createSimulation(aPrefix, 400, 0, 400, 765, 400, 0);
     }
 
-    void processArgs(String[] args) {
-        System.out.println("Registry host:" + assignments.util.mainArgs.ClientArgsProcessor.getRegistryHost(args));
-        System.out.println("Registry port:" + assignments.util.mainArgs.ClientArgsProcessor.getRegistryPort(args));
-        System.out.println("Server host:" + assignments.util.mainArgs.ClientArgsProcessor.getServerHost(args));
-        System.out.println("Headless:" + assignments.util.mainArgs.ClientArgsProcessor.getHeadless(args));
-        System.out.println("Client name:" + assignments.util.mainArgs.ClientArgsProcessor.getClientName(args));
-        System.setProperty("java.awt.headless", ClientArgsProcessor.getHeadless(args));
-    }
-
-    protected void setTracing() {
-        PortTraceUtility.setTracing();
-        RMITraceUtility.setTracing();
-        NIOTraceUtility.setTracing();
-        FactoryTraceUtility.setTracing();
-        ConsensusTraceUtility.setTracing();
-        ThreadDelayed.enablePrint();
-        this.trace(true);
-    }
-
     protected void init() {
 
-        this.setTracing();
-//        this.processArgs(args);
         if (isFirst) {
             this.commandProcessor = this.createSimulation1("1:");
             isFirst = false;
         } else {
             this.commandProcessor = this.createSimulation2("2:");
         }
-
-        this.inCoupler = new InCoupler( (DistributedCommandProcessor) this.commandProcessor, clientName); //waits to get from outCoupler
-
-        //this.commandProcessor.addPropertyChangeListener();
-
     }
 
     public void setOutCoupler(PropertyChangeListener outCoupler){
+        this.outCoupler = outCoupler;
+        this.commandProcessor.addPropertyChangeListener(this.outCoupler);
+    }
+    public void setInCoupler(PropertyChangeListener outCoupler){
         this.outCoupler = outCoupler;
         this.commandProcessor.addPropertyChangeListener(this.outCoupler);
     }
@@ -143,7 +110,6 @@ public class ASimulation extends AnAbstractSimulationParametersBean implements S
     public void atomicBroadcast(boolean newValue) {
         super.atomicBroadcast(newValue);
         this.commandProcessor.setConnectedToSimulation(!this.isAtomicBroadcast());
-        this.commandProcessor2.setConnectedToSimulation(!this.isAtomicBroadcast());
     }
 
     public void experimentInput() {

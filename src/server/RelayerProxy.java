@@ -1,7 +1,7 @@
 package server;
 
 import client.DistributedCoupler;
-import shared.traces.RemoteProposeRequestReceived;
+import util.trace.port.consensus.RemoteProposeRequestReceived;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
 
@@ -16,10 +16,9 @@ public class RelayerProxy implements Relayer, DistributedRelayer {
         this.rmiServer = rmiServer;
     }
 
-
     @Override
     public void join(String name, DistributedCoupler inCoupler){
-        this.rmiServer.getClients().put(name, inCoupler);
+        this.rmiServer.addClient(name, inCoupler);
     }
 
     @Override

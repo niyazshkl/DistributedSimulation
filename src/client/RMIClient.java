@@ -1,6 +1,9 @@
 package client;
 
+import assignments.util.mainArgs.ClientArgsProcessor;
+import client.modifiedStarter.ASimulation;
 import server.DistributedRelayer;
+import shared.Constants;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
 import util.trace.port.consensus.RemoteProposeRequestSent;
@@ -16,63 +19,57 @@ import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 
 @Tags({DistributedTags.CLIENT_CONFIGURER, DistributedTags.RMI})
-public class RMIClient {
+public class RMIClient extends Constants implements Client {
 
     private String name;
+    private String registryHost;
+    private int registryPort;
+    private Coupler inCoupler;
     private DistributedRelayer serverProxy;
 
-    public RMIClient(String name) {
+    public RMIClient(){}
+    public RMIClient(String name, String registryHost, int registryPort) {
         this.name = name;
+        this.registryHost = registryHost;
+        this.registryPort = registryPort;
+        this.inCoupler = new InCoupler(this);
     }
 
-    public static void main(String[] args){
+    @Override
+    public void initializeClient(String[] args) {
         String name = ClientArgsProcessor.getClientName(args);
-        RMIClient rmiClient = new RMIClient(name);
-        rmiClient.init(args);
+        int registryPort = ClientArgsProcessor.getRegistryPort(args);
+        String registryHost = ClientArgsProcessor.getRegistryHost(args);
+
+        RMIClient rmiClient = new RMIClient(name, registryHost, registryPort);
+        rmiClient.configureSimulation();
+        rmiClient.joinServer();
     }
 
-    public void init(String[] args){
-        //create client
-        int registryPort = ClientArgsProcessor.getRegistryPort(args);
-        //create simulation
-        ASimulation aSimulation = new ASimulation(this.name);
+    public void configureSimulation(){
+        // Create and configure simulation
+        ASimulation aSimulation = new ASimulation(this);
+        PropertyChangeListener outCoupler = new OutCoupler(this);
 
-        //get the inCoupler proxy
+        aSimulation.setInCoupler(this.inCoupler); //inCoupler holds an instance of the Processor but does not observe anything.
+        aSimulation.setOutCoupler(outCoupler); // outCoupler observes the Processor inside simulation, holds instance of InCoupler -> changes report to relayerProxy
+    }
 
-        DistributedCoupler inCouplerProxy = aSimulation.getInCoupler();
-
-        //lookup the rmiregistry
+    public void joinServer(){
         try {
-            UnicastRemoteObject.exportObject(inCouplerProxy, 0); // I forgot this which didnt send proxy, but sent copy instead
+            UnicastRemoteObject.exportObject((DistributedCoupler) inCoupler, 0); // I forgot this which didn't send proxy, but sent copy instead
 
             Registry rmiRegistry = LocateRegistry.getRegistry(registryPort);
-            RMIRegistryLocated.newCase(this, ClientArgsProcessor.getRegistryHost(args), registryPort, rmiRegistry);
+            RMIRegistryLocated.newCase(this, registryHost, registryPort, rmiRegistry);
 
-            this.serverProxy =  (DistributedRelayer) rmiRegistry.lookup("RELAYER");
-            RMIObjectLookedUp.newCase(this, serverProxy, "RELAYER", rmiRegistry);
+            this.serverProxy =  (DistributedRelayer) rmiRegistry.lookup(Constants.RMI_RELAYER);
+            RMIObjectLookedUp.newCase(this, serverProxy, Constants.RMI_RELAYER, rmiRegistry);
 
-            serverProxy.join(this.name, inCouplerProxy);
+            serverProxy.join(this.name, (DistributedCoupler) inCoupler);
 
-            PropertyChangeListener outCoupler = new OutCoupler(this);
-            aSimulation.setOutCoupler(outCoupler); //adds outCoupler as a observer internally
-
-
-
-
-
-        } catch (RemoteException e) {
-            throw new RuntimeException(e);
-        } catch (NotBoundException e) {
+        } catch (RemoteException | NotBoundException e) {
             throw new RuntimeException(e);
         }
-        //lookup the serverproxyrelyer
-
-        //join inCoupler with it
-
-        //outCoupler needs to be creted and then use simulation.outCoupler
-
-        //I think thats it?
-
     }
 
     public void send(PropertyChangeEvent propertyChangeEvent){
