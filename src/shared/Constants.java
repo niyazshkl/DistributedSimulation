@@ -1,6 +1,8 @@
 package shared;
 
 import assignments.util.inputParameters.AnAbstractSimulationParametersBean;
+import coupledsims.AStandAloneTwoCoupledHalloweenSimulations;
+import util.interactiveMethodInvocation.SimulationParametersControllerFactory;
 import util.trace.factories.FactoryTraceUtility;
 import util.trace.misc.ThreadDelayed;
 import util.trace.port.PortTraceUtility;
@@ -19,5 +21,10 @@ public abstract class Constants extends AnAbstractSimulationParametersBean {
         ConsensusTraceUtility.setTracing();
         ThreadDelayed.enablePrint();
         this.trace(true);
+    }
+    protected void boilerPlate(){
+        //Copied from Comp533All.jar/coupledsims/AStandAloneTwoCoupledHalloweenSimulations::start
+        SimulationParametersControllerFactory.getSingleton().addSimulationParameterListener(this);
+        SimulationParametersControllerFactory.getSingleton().processCommands();
     }
 }

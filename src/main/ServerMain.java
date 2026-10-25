@@ -9,7 +9,7 @@ import util.tags.DistributedTags;
 public class ServerMain {
     public static void main(String[] args){
         info(args);
-        new RMIServer().launchServer(args);
+        RMIServer.launchServer(args);
     }
 
     public static void info(String[] args) {

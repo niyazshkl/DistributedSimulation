@@ -23,46 +23,48 @@ public class RMIServer extends Constants implements Server{
 
     private Map<String, DistributedCoupler> clients;
     private Relayer relayer;
-    private String host;
-    private int port;
+    private String registryHost;
+    private int registryPort;
 
-    public RMIServer() {
-        super();
+    public RMIServer(String registryHost, int registryPort) {
+        super(); //set tracing is done.
+        this.registryHost = registryHost;
+        this.registryPort = registryPort;
         this.clients = new HashMap<>();
         this.relayer = new RelayerProxy(this);
     }
 
-    public void setHost(String host) {
-        this.host = host;
+    public void setRegistryHost(String registryHost) {
+        this.registryHost = registryHost;
     }
 
-    public void setPort(int port) {
-        this.port = port;
-    }
-    @Override
-    public void launchServer(String[] args){
-        String host = ServerArgsProcessor.getRegistryHost(args);
-        int port = ServerArgsProcessor.getRegistryPort(args);
-
-        info(host, port);
-
-        RMIServer rmiServer = new RMIServer();
-
-        rmiServer.setHost(host);
-        rmiServer.setPort(port);
-        rmiServer.registerRemoteObject(args);
+    public void setRegistryPort(int registryPort) {
+        this.registryPort = registryPort;
     }
 
-    private void info(String host, int port) {
-        System.out.println("RMIServer: Registry Host: " + host);
-        System.out.println("RMIServer: Registry Port: " + port);
+    public static void launchServer(String[] args){
+        String registryHost = ServerArgsProcessor.getRegistryHost(args);
+        int registryPort = ServerArgsProcessor.getRegistryPort(args);
+        RMIServer rmiServer = new RMIServer(registryHost, registryPort);
+        rmiServer.launchServer();
     }
 
-    public void registerRemoteObject(String[] args){
+    public void launchServer(){
+        this.info();
+        this.boilerPlate();
+        this.registerRemoteObject();
+    }
+
+    private void info() {
+        System.out.println("RMIServer: Registry Host: " + registryHost);
+        System.out.println("RMIServer: Registry Port: " + registryPort);
+    }
+
+    public void registerRemoteObject(){
         try {
-            Registry rmiRegistry = LocateRegistry.getRegistry(port);
+            Registry rmiRegistry = LocateRegistry.getRegistry(registryPort);
 
-            RMIRegistryLocated.newCase(this, host, port, rmiRegistry);
+            RMIRegistryLocated.newCase(this, registryHost, registryPort, rmiRegistry);
 
             DistributedRelayer proxy =
                     (DistributedRelayer) UnicastRemoteObject.exportObject(

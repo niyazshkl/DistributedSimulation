@@ -5,6 +5,7 @@ import client.modifiedStarter.ASimulation;
 import server.DistributedRelayer;
 import shared.Constants;
 import util.annotations.Tags;
+import util.interactiveMethodInvocation.SimulationParametersControllerFactory;
 import util.tags.DistributedTags;
 import util.trace.port.consensus.RemoteProposeRequestSent;
 import util.trace.port.rpc.rmi.RMIObjectLookedUp;
@@ -40,6 +41,8 @@ public class RMIClient extends Constants implements Client {
         String name = ClientArgsProcessor.getClientName(args);
         int registryPort = ClientArgsProcessor.getRegistryPort(args);
         String registryHost = ClientArgsProcessor.getRegistryHost(args);
+
+        boilerPlate();
 
         RMIClient rmiClient = new RMIClient(name, registryHost, registryPort);
         rmiClient.configureSimulation();
