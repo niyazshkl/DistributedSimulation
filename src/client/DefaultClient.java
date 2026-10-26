@@ -2,6 +2,7 @@ package client;
 
 import assignments.util.mainArgs.ClientArgsProcessor;
 import client.modifiedStarter.ASimulation;
+import examples.nio.manager.print.AnNIOManagerPrintClient;
 import inputport.rpc.GIPCLocateRegistry;
 import inputport.rpc.GIPCRegistry;
 import server.DistributedRelayer;
@@ -109,23 +110,15 @@ public class DefaultClient extends Constants implements Client {
     }
 
     public void gipcProxyJoin(){
-        //get the registry
-//        GIPCLocateRegistry.createRegistry(gipcServerPort);// solution??
-
 
         GIPCRegistryLocated.newCase(this, serverHost, gipcServerPort, name);
         GIPCRegistry gipcRegistry = GIPCLocateRegistry.getRegistry(serverHost, gipcServerPort, name);
-        //lookup the relayer
 
         GIPCRelayer gipcServerProxy = (GIPCRelayer) gipcRegistry.lookup(GIPCRelayer.class, Constants.GIPC_RELAYER);
         GIPCObjectLookedUp.newCase(this, gipcServerProxy, GIPCRelayer.class, Constants.GIPC_RELAYER, gipcRegistry);
         this.gipcServerProxy = gipcServerProxy;
 
-        //add the client proxy to the relayer
-        System.out.println("Joining gipcProxy");
         gipcServerProxy.join(name, (GIPCCoupler) inCoupler);
-        System.out.println("Joined gipcProxy");
-
     }
 
 
@@ -148,8 +141,8 @@ public class DefaultClient extends Constants implements Client {
         ProposalMade.newCase(this, "ipc_mechanism", -1.0F, newValue);
         var oldValue = getIPCMechanism();
         this.setIPCMechanism(newValue);
-        if (isBroadcastMetaState()){
-            //broadcast using rmiProxy always if the broadcast is set active.
+        if (isBroadcastMetaState()){// if the broadcast is set active
+            //broadcast IpcMechanism replica object always using rmiProxy (never any other IPC Mechanism).
             PropertyChangeEvent propertyChangeEvent = new PropertyChangeEvent(this, "ipc_mechanism",oldValue,getIPCMechanism());
             try {
                 this.rmiServerProxy.send(name, propertyChangeEvent);
