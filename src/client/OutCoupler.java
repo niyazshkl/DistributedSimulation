@@ -9,10 +9,10 @@ import java.beans.PropertyChangeListener;
 @Tags({DistributedTags.CLIENT_OUT_COUPLER, DistributedTags.RMI})
 public class OutCoupler implements PropertyChangeListener {
 
-    private final RMIClient rmiClient;
+    private final DefaultClient defaultClient;
 
-    public OutCoupler(RMIClient rmiClient) {
-        this.rmiClient = rmiClient;
+    public OutCoupler(DefaultClient defaultClient) {
+        this.defaultClient = defaultClient;
     }
 
     @Override
@@ -20,6 +20,6 @@ public class OutCoupler implements PropertyChangeListener {
         if (!anEvent.getPropertyName().equals("InputString")) return;
         String newCommand = (String) anEvent.getNewValue();
         ProposalMade.newCase(this, this.toString(), -1, anEvent);
-        this.rmiClient.send(anEvent);
+        this.defaultClient.send(anEvent);
     }
 }

@@ -3,11 +3,17 @@ package server;
 import assignments.util.mainArgs.ServerArgsProcessor;
 
 import client.DistributedCoupler;
+import inputport.ConnectionType;
+import inputport.rpc.GIPCLocateRegistry;
+import inputport.rpc.GIPCRegistry;
 import shared.Constants;
+import util.interactiveMethodInvocation.SimulationParametersControllerFactory;
 import util.trace.port.consensus.ProposalLearnedNotificationSent;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
 import util.trace.port.consensus.ProposalMade;
+import util.trace.port.rpc.gipc.GIPCObjectRegistered;
+import util.trace.port.rpc.gipc.GIPCRegistryCreated;
 import util.trace.port.rpc.rmi.RMIObjectRegistered;
 import util.trace.port.rpc.rmi.RMIRegistryLocated;
 
@@ -19,17 +25,21 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.HashMap;
 import java.util.Map;
 @Tags({DistributedTags.SERVER_CONFIGURER, DistributedTags.RMI})
-public class RMIServer extends Constants implements Server{
+public class DefaultServer extends Constants implements Server{
 
     private Map<String, DistributedCoupler> clients;
     private Relayer relayer;
     private String registryHost;
-    private int registryPort;
+    private int rmiRegistryPort;
+    private int gipcServerPort;
+    private Registry rmiRegistry;
+    private GIPCRegistry gipcRegistry;
 
-    public RMIServer(String registryHost, int registryPort) {
+    public DefaultServer(String registryHost, int rmiRegistryPort, int gipcServerPort) {
         super(); //set tracing is done.
         this.registryHost = registryHost;
-        this.registryPort = registryPort;
+        this.rmiRegistryPort = rmiRegistryPort;
+        this.gipcServerPort = gipcServerPort;
         this.clients = new HashMap<>();
         this.relayer = new RelayerProxy(this);
     }
@@ -38,34 +48,37 @@ public class RMIServer extends Constants implements Server{
         this.registryHost = registryHost;
     }
 
-    public void setRegistryPort(int registryPort) {
-        this.registryPort = registryPort;
+    public void setRmiRegistryPort(int rmiRegistryPort) {
+        this.rmiRegistryPort = rmiRegistryPort;
     }
 
     public static void launchServer(String[] args){
         String registryHost = ServerArgsProcessor.getRegistryHost(args);
         int registryPort = ServerArgsProcessor.getRegistryPort(args);
-        RMIServer rmiServer = new RMIServer(registryHost, registryPort);
-        rmiServer.launchServer();
+        int gipcServerPort = ServerArgsProcessor.getGIPCServerPort(args);
+        DefaultServer defaultServer = new DefaultServer(registryHost, registryPort, gipcServerPort);
+        defaultServer.launchServer();
     }
 
     public void launchServer(){
         this.info();
-        this.boilerPlate();
-        this.registerRemoteObject();
+        this.rmiRegister();
+        this.gipcRegister();
+//        this.boilerPlate();
     }
 
     private void info() {
-        System.out.println("RMIServer: Registry Host: " + registryHost);
-        System.out.println("RMIServer: Registry Port: " + registryPort);
+        System.out.println("Registry Host: " + registryHost);
+        System.out.println("RMI Registry Port: " + rmiRegistryPort);
+        System.out.println("GIPC Server Port: " + gipcServerPort);
     }
 
-    public void registerRemoteObject(){
+    private void rmiRegister(){
         try {
-            Registry rmiRegistry = LocateRegistry.getRegistry(registryPort);
+            Registry rmiRegistry = LocateRegistry.getRegistry(rmiRegistryPort);
 
-            RMIRegistryLocated.newCase(this, registryHost, registryPort, rmiRegistry);
-
+            RMIRegistryLocated.newCase(this, registryHost, rmiRegistryPort, rmiRegistry);
+            this.rmiRegistry = rmiRegistry;
             DistributedRelayer proxy =
                     (DistributedRelayer) UnicastRemoteObject.exportObject(
                             (DistributedRelayer) relayer, 0
@@ -81,6 +94,22 @@ public class RMIServer extends Constants implements Server{
         } catch (RemoteException e) {
             throw new RuntimeException(e);
         }
+    }
+    private void boilerPlate(){
+        //Copied from Comp533All.jar/coupledsims/AStandAloneTwoCoupledHalloweenSimulations::start
+        SimulationParametersControllerFactory.getSingleton().addSimulationParameterListener(this);
+        SimulationParametersControllerFactory.getSingleton().processCommands();
+    }
+
+    private void gipcRegister(){
+        GIPCRegistryCreated.newCase(this,gipcServerPort);
+        GIPCRegistry gipcRegistry = GIPCLocateRegistry.createRegistry(gipcServerPort);
+        this.gipcRegistry = gipcRegistry;
+        //add the proxy to this one too.
+        GIPCObjectRegistered.newCase(this, Constants.GIPC_RELAYER, this.relayer, gipcRegistry);
+        gipcRegistry.rebind(Constants.GIPC_RELAYER, this.relayer);
+
+        gipcRegistry.getInputPort().addConnectionListener(this);
     }
 
     public void broadcast(String senderName, PropertyChangeEvent event) {
@@ -101,5 +130,6 @@ public class RMIServer extends Constants implements Server{
     public void addClient(String name, DistributedCoupler inCoupler){
         this.clients.put(name, inCoupler); //overwrites previous incoupler of a client
     }
+
 
 }

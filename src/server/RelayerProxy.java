@@ -9,22 +9,22 @@ import java.beans.PropertyChangeEvent;
 import java.rmi.RemoteException;
 
 @Tags({DistributedTags.SERVER_REMOTE_OBJECT, DistributedTags.RMI})
-public class RelayerProxy implements Relayer, DistributedRelayer {
-    private RMIServer rmiServer;
+public class RelayerProxy implements Relayer, GIPCRelayer, DistributedRelayer {
+    private DefaultServer defaultServer;
 
-    public RelayerProxy(RMIServer rmiServer) {
-        this.rmiServer = rmiServer;
+    public RelayerProxy(DefaultServer defaultServer) {
+        this.defaultServer = defaultServer;
     }
 
     @Override
     public void join(String name, DistributedCoupler inCoupler){
-        this.rmiServer.addClient(name, inCoupler);
+        this.defaultServer.addClient(name, inCoupler);
     }
 
     @Override
-    public void send(String sender, PropertyChangeEvent event) throws RemoteException {
+    public void send(String sender, PropertyChangeEvent event) {
         RemoteProposeRequestReceived.newCase(this, sender, -1, event);
-        this.rmiServer.broadcast(sender,event);
+        this.defaultServer.broadcast(sender,event);
     }
 
 }

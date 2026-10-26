@@ -11,9 +11,9 @@ import java.rmi.registry.LocateRegistry;
 import java.util.Scanner;
 
 @Tags({DistributedTags.REGISTRY, DistributedTags.RMI})
-public class RMIRegsitry extends Constants implements Registry {
+public class DefaultRegistry extends Constants implements Registry {
     private int port;
-    public RMIRegsitry(){}
+    public DefaultRegistry(){}
     @Override
     public void createRegistry(String[] args){
         try {

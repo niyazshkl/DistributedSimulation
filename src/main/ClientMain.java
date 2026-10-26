@@ -1,7 +1,7 @@
 package main;
 
 import assignments.util.mainArgs.ClientArgsProcessor;
-import client.RMIClient;
+import client.DefaultClient;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
 
@@ -9,7 +9,7 @@ import util.tags.DistributedTags;
 public class ClientMain {
     public static void main(String[] args){
         info(args);
-        new RMIClient().initializeClient(args);
+        new DefaultClient().initializeClient(args);
     }
 
     public static void info(String[] args) {

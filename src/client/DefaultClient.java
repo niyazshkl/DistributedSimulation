@@ -2,12 +2,18 @@ package client;
 
 import assignments.util.mainArgs.ClientArgsProcessor;
 import client.modifiedStarter.ASimulation;
+import inputport.rpc.GIPCLocateRegistry;
+import inputport.rpc.GIPCRegistry;
 import server.DistributedRelayer;
+import server.GIPCRelayer;
 import shared.Constants;
 import util.annotations.Tags;
 import util.interactiveMethodInvocation.SimulationParametersControllerFactory;
 import util.tags.DistributedTags;
 import util.trace.port.consensus.RemoteProposeRequestSent;
+import util.trace.port.rpc.gipc.GIPCObjectLookedUp;
+import util.trace.port.rpc.gipc.GIPCObjectRegistered;
+import util.trace.port.rpc.gipc.GIPCRegistryLocated;
 import util.trace.port.rpc.rmi.RMIObjectLookedUp;
 import util.trace.port.rpc.rmi.RMIRegistryLocated;
 
@@ -20,33 +26,55 @@ import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 
 @Tags({DistributedTags.CLIENT_CONFIGURER, DistributedTags.RMI})
-public class RMIClient extends Constants implements Client {
+public class DefaultClient extends Constants implements Client {
 
     private String name;
+
     private String registryHost;
     private int registryPort;
+
+    private String serverHost;
+    private int serverPort;
+
+    private int gipcServerPort;
+
     private Coupler inCoupler;
     private DistributedRelayer serverProxy;
 
-    public RMIClient(){}
-    public RMIClient(String name, String registryHost, int registryPort) {
+    public DefaultClient(){}
+    public DefaultClient(String name, String registryHost, int registryPort, String serverHost, int serverPort, int gipcServerPort) {
         this.name = name;
         this.registryHost = registryHost;
         this.registryPort = registryPort;
+        this.serverHost = serverHost;
+        this.serverPort = serverPort;
         this.inCoupler = new InCoupler(this);
+        this.gipcServerPort = gipcServerPort;
     }
 
     @Override
     public void initializeClient(String[] args) {
         String name = ClientArgsProcessor.getClientName(args);
+
         int registryPort = ClientArgsProcessor.getRegistryPort(args);
         String registryHost = ClientArgsProcessor.getRegistryHost(args);
 
-        boilerPlate();
+        String serverHost = ClientArgsProcessor.getServerHost(args);
+        int serverPort = ClientArgsProcessor.getServerPort(args);
 
-        RMIClient rmiClient = new RMIClient(name, registryHost, registryPort);
-        rmiClient.configureSimulation();
-        rmiClient.joinServer();
+        int gipcServerPort = ClientArgsProcessor.getGIPCPort(args);
+
+        DefaultClient defaultClient = new DefaultClient(name, registryHost, registryPort, serverHost, serverPort, gipcServerPort);
+        defaultClient.configureSimulation();
+        defaultClient.rmiProxyJoin();
+        defaultClient.gipcProxyJoin();
+
+        boilerPlate();
+    }
+    private void boilerPlate(){
+        //Copied from Comp533All.jar/coupledsims/AStandAloneTwoCoupledHalloweenSimulations::start
+        SimulationParametersControllerFactory.getSingleton().addSimulationParameterListener(this);
+        SimulationParametersControllerFactory.getSingleton().processCommands();
     }
 
     public void configureSimulation(){
@@ -58,7 +86,7 @@ public class RMIClient extends Constants implements Client {
         aSimulation.setOutCoupler(outCoupler); // outCoupler observes the Processor inside simulation, holds instance of InCoupler -> changes report to relayerProxy
     }
 
-    public void joinServer(){
+    public void rmiProxyJoin(){
         try {
             UnicastRemoteObject.exportObject((DistributedCoupler) inCoupler, 0); // I forgot this which didn't send proxy, but sent copy instead
 
@@ -74,6 +102,28 @@ public class RMIClient extends Constants implements Client {
             throw new RuntimeException(e);
         }
     }
+
+    public void gipcProxyJoin(){
+        //get the registry
+//        GIPCLocateRegistry.createRegistry(gipcServerPort);// solution??
+
+
+        GIPCRegistryLocated.newCase(this, serverHost, gipcServerPort, name);
+        GIPCRegistry gipcRegistry = GIPCLocateRegistry.getRegistry(serverHost, gipcServerPort, name);
+        //lookup the relayer
+
+        GIPCRelayer gipcProxy = (GIPCRelayer) gipcRegistry.lookup(GIPCRelayer.class, Constants.GIPC_RELAYER);
+        GIPCObjectLookedUp.newCase(this, gipcProxy, GIPCRelayer.class, Constants.GIPC_RELAYER, gipcRegistry);
+
+
+        //add the client proxy to the relayer
+        System.out.println("Joining gipcProxy");
+        gipcProxy.join(name, (DistributedCoupler) inCoupler);
+        System.out.println("Joined gipcProxy");
+
+    }
+
+
 
     public void send(PropertyChangeEvent propertyChangeEvent){
         RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);

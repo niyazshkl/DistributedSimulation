@@ -1,7 +1,7 @@
 package main;
 
 import assignments.util.mainArgs.ServerArgsProcessor;
-import server.RMIServer;
+import server.DefaultServer;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
 
@@ -9,7 +9,7 @@ import util.tags.DistributedTags;
 public class ServerMain {
     public static void main(String[] args){
         info(args);
-        RMIServer.launchServer(args);
+        DefaultServer.launchServer(args);
     }
 
     public static void info(String[] args) {
