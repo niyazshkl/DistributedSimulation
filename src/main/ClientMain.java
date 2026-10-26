@@ -5,11 +5,11 @@ import client.DefaultClient;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
 
-@Tags({DistributedTags.CLIENT, DistributedTags.RMI})
+@Tags({DistributedTags.CLIENT, DistributedTags.RMI, DistributedTags.GIPC})
 public class ClientMain {
     public static void main(String[] args){
         info(args);
-        new DefaultClient().initializeClient(args);
+        DefaultClient.initializeClient(args);
     }
 
     public static void info(String[] args) {

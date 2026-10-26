@@ -1,5 +1,7 @@
 package client;
 
-public interface Client {
-    void initializeClient(String[] args);
+import assignments.util.inputParameters.SimulationParametersBean;
+import util.interactiveMethodInvocation.IPCMechanism;
+
+public interface Client extends SimulationParametersBean {
 }

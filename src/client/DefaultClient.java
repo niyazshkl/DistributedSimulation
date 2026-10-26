@@ -8,11 +8,12 @@ import server.DistributedRelayer;
 import server.GIPCRelayer;
 import shared.Constants;
 import util.annotations.Tags;
+import util.interactiveMethodInvocation.IPCMechanism;
 import util.interactiveMethodInvocation.SimulationParametersControllerFactory;
 import util.tags.DistributedTags;
+import util.trace.port.consensus.ProposalMade;
 import util.trace.port.consensus.RemoteProposeRequestSent;
 import util.trace.port.rpc.gipc.GIPCObjectLookedUp;
-import util.trace.port.rpc.gipc.GIPCObjectRegistered;
 import util.trace.port.rpc.gipc.GIPCRegistryLocated;
 import util.trace.port.rpc.rmi.RMIObjectLookedUp;
 import util.trace.port.rpc.rmi.RMIRegistryLocated;
@@ -25,7 +26,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 
-@Tags({DistributedTags.CLIENT_CONFIGURER, DistributedTags.RMI})
+@Tags({DistributedTags.CLIENT_CONFIGURER, DistributedTags.RMI, DistributedTags.GIPC})
 public class DefaultClient extends Constants implements Client {
 
     private String name;
@@ -39,7 +40,11 @@ public class DefaultClient extends Constants implements Client {
     private int gipcServerPort;
 
     private Coupler inCoupler;
-    private DistributedRelayer serverProxy;
+
+    private DistributedRelayer rmiServerProxy;
+    private GIPCRelayer gipcServerProxy;
+
+    //inherits boolean broadcastIPCMechanism & IPCMechanism ipcMechanism from AnAbstractSimulationParametersBean
 
     public DefaultClient(){}
     public DefaultClient(String name, String registryHost, int registryPort, String serverHost, int serverPort, int gipcServerPort) {
@@ -50,10 +55,10 @@ public class DefaultClient extends Constants implements Client {
         this.serverPort = serverPort;
         this.inCoupler = new InCoupler(this);
         this.gipcServerPort = gipcServerPort;
+        this.setIPCMechanism(IPCMechanism.RMI); //default start point.
     }
 
-    @Override
-    public void initializeClient(String[] args) {
+    public static void initializeClient(String[] args) {
         String name = ClientArgsProcessor.getClientName(args);
 
         int registryPort = ClientArgsProcessor.getRegistryPort(args);
@@ -69,7 +74,7 @@ public class DefaultClient extends Constants implements Client {
         defaultClient.rmiProxyJoin();
         defaultClient.gipcProxyJoin();
 
-        boilerPlate();
+        defaultClient.boilerPlate();
     }
     private void boilerPlate(){
         //Copied from Comp533All.jar/coupledsims/AStandAloneTwoCoupledHalloweenSimulations::start
@@ -93,10 +98,10 @@ public class DefaultClient extends Constants implements Client {
             Registry rmiRegistry = LocateRegistry.getRegistry(registryPort);
             RMIRegistryLocated.newCase(this, registryHost, registryPort, rmiRegistry);
 
-            this.serverProxy =  (DistributedRelayer) rmiRegistry.lookup(Constants.RMI_RELAYER);
-            RMIObjectLookedUp.newCase(this, serverProxy, Constants.RMI_RELAYER, rmiRegistry);
+            this.rmiServerProxy =  (DistributedRelayer) rmiRegistry.lookup(Constants.RMI_RELAYER);
+            RMIObjectLookedUp.newCase(this, rmiServerProxy, Constants.RMI_RELAYER, rmiRegistry);
 
-            serverProxy.join(this.name, (DistributedCoupler) inCoupler);
+            rmiServerProxy.join(this.name, (DistributedCoupler) inCoupler);
 
         } catch (RemoteException | NotBoundException e) {
             throw new RuntimeException(e);
@@ -112,13 +117,13 @@ public class DefaultClient extends Constants implements Client {
         GIPCRegistry gipcRegistry = GIPCLocateRegistry.getRegistry(serverHost, gipcServerPort, name);
         //lookup the relayer
 
-        GIPCRelayer gipcProxy = (GIPCRelayer) gipcRegistry.lookup(GIPCRelayer.class, Constants.GIPC_RELAYER);
-        GIPCObjectLookedUp.newCase(this, gipcProxy, GIPCRelayer.class, Constants.GIPC_RELAYER, gipcRegistry);
-
+        GIPCRelayer gipcServerProxy = (GIPCRelayer) gipcRegistry.lookup(GIPCRelayer.class, Constants.GIPC_RELAYER);
+        GIPCObjectLookedUp.newCase(this, gipcServerProxy, GIPCRelayer.class, Constants.GIPC_RELAYER, gipcRegistry);
+        this.gipcServerProxy = gipcServerProxy;
 
         //add the client proxy to the relayer
         System.out.println("Joining gipcProxy");
-        gipcProxy.join(name, (DistributedCoupler) inCoupler);
+        gipcServerProxy.join(name, (GIPCCoupler) inCoupler);
         System.out.println("Joined gipcProxy");
 
     }
@@ -127,10 +132,30 @@ public class DefaultClient extends Constants implements Client {
 
     public void send(PropertyChangeEvent propertyChangeEvent){
         RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
+        if (this.getIPCMechanism()==IPCMechanism.RMI){
         try {
-            this.serverProxy.send(this.name, propertyChangeEvent);
+            this.rmiServerProxy.send(this.name, propertyChangeEvent);
         } catch (RemoteException e) {
             throw new RuntimeException(e);
+        }
+        }
+        else if (this.getIPCMechanism()==IPCMechanism.GIPC){
+            this.gipcServerProxy.send(this.name, propertyChangeEvent);
+        }
+    }
+    @Override
+    public void ipcMechanism(IPCMechanism newValue){
+        ProposalMade.newCase(this, "ipc_mechanism", -1.0F, newValue);
+        var oldValue = getIPCMechanism();
+        this.setIPCMechanism(newValue);
+        if (isBroadcastMetaState()){
+            //broadcast using rmiProxy always if the broadcast is set active.
+            PropertyChangeEvent propertyChangeEvent = new PropertyChangeEvent(this, "ipc_mechanism",oldValue,getIPCMechanism());
+            try {
+                this.rmiServerProxy.send(name, propertyChangeEvent);
+            } catch (RemoteException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }

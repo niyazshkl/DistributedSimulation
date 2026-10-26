@@ -6,7 +6,7 @@ import util.trace.port.consensus.ProposalMade;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-@Tags({DistributedTags.CLIENT_OUT_COUPLER, DistributedTags.RMI})
+@Tags({DistributedTags.CLIENT_OUT_COUPLER, DistributedTags.RMI, DistributedTags.GIPC})
 public class OutCoupler implements PropertyChangeListener {
 
     private final DefaultClient defaultClient;
@@ -16,10 +16,10 @@ public class OutCoupler implements PropertyChangeListener {
     }
 
     @Override
-    public void propertyChange(PropertyChangeEvent anEvent) { //update sent from relayer!
-        if (!anEvent.getPropertyName().equals("InputString")) return;
+    public void propertyChange(PropertyChangeEvent anEvent) {
+        if (!anEvent.getPropertyName().equals("InputString")) return; //this is fine becasue the ipc_mechanims doesn't come from the commandProccessor
         String newCommand = (String) anEvent.getNewValue();
         ProposalMade.newCase(this, this.toString(), -1, anEvent);
-        this.defaultClient.send(anEvent);
+        this.defaultClient.send(anEvent); //handles IPC mechanism there
     }
 }

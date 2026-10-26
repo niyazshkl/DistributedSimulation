@@ -1,6 +1,7 @@
 package server;
 
 import client.DistributedCoupler;
+import client.GIPCCoupler;
 import util.trace.port.consensus.RemoteProposeRequestReceived;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
@@ -8,7 +9,7 @@ import util.tags.DistributedTags;
 import java.beans.PropertyChangeEvent;
 import java.rmi.RemoteException;
 
-@Tags({DistributedTags.SERVER_REMOTE_OBJECT, DistributedTags.RMI})
+@Tags({DistributedTags.SERVER_REMOTE_OBJECT, DistributedTags.RMI, DistributedTags.GIPC})
 public class RelayerProxy implements Relayer, GIPCRelayer, DistributedRelayer {
     private DefaultServer defaultServer;
 
@@ -19,6 +20,11 @@ public class RelayerProxy implements Relayer, GIPCRelayer, DistributedRelayer {
     @Override
     public void join(String name, DistributedCoupler inCoupler){
         this.defaultServer.addClient(name, inCoupler);
+    }
+
+    @Override
+    public void join(String name, GIPCCoupler inCoupler) {
+        this.defaultServer.addGipcClient(name, inCoupler);
     }
 
     @Override
