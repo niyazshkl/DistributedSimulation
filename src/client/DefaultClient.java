@@ -18,6 +18,8 @@ import util.annotations.Tags;
 import util.interactiveMethodInvocation.IPCMechanism;
 import util.interactiveMethodInvocation.SimulationParametersControllerFactory;
 import util.tags.DistributedTags;
+import util.trace.port.PerformanceExperimentEnded;
+import util.trace.port.PerformanceExperimentStarted;
 import util.trace.port.consensus.ProposalLearnedNotificationSent;
 import util.trace.port.consensus.ProposalMade;
 import util.trace.port.consensus.RemoteProposeRequestReceived;
@@ -66,6 +68,8 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
 
     private BlockingQueue<String> commands;
     private Simulation simulation;
+
+    protected int NUM_EXPERIMENT_COMMANDS = 500;
 
     //inherits boolean broadcastIPCMechanism & IPCMechanism ipcMechanism from AnAbstractSimulationParametersBean
 
@@ -163,7 +167,6 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
         gipcServerProxy.join(name, (GIPCCoupler) inCoupler);
     }
 
-
     @Override
     public void localProcessingOnly(boolean newValue){
         super.localProcessingOnly(newValue);
@@ -192,6 +195,22 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
     @Override
     public void processSimulationCommand(String command){
         this.simulation.processSimulationCommand(command);
+    }
+    @Override
+    public void experimentInput() {
+        long aStartTime = System.currentTimeMillis();
+        PerformanceExperimentStarted.newCase(this, aStartTime, this.NUM_EXPERIMENT_COMMANDS);
+        boolean anOldValue = this.isTrace();
+        this.trace(false);
+
+        for(int i = 0; i < this.NUM_EXPERIMENT_COMMANDS; ++i) {
+            this.simulation.simulationCommand("move 1 -1");
+            this.simulation.simulationCommand("undo");
+        }
+
+        this.trace(anOldValue);
+        long anEndTime = System.currentTimeMillis();
+        PerformanceExperimentEnded.newCase(this, aStartTime, anEndTime, anEndTime - aStartTime, this.NUM_EXPERIMENT_COMMANDS);
     }
     @Override
     public void ipcMechanism(IPCMechanism newValue){
