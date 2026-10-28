@@ -3,14 +3,16 @@ package server;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
 
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 
 @Tags({DistributedTags.SERVER_READ_THREAD, DistributedTags.NIO})
 public class ServerReader implements Reader{
     Server server;
-    private BlockingQueue<KeyValue<String, String>> blockingQueue;
+    private BlockingQueue<KeyValue<SocketAddress, ByteBuffer>> blockingQueue;
 
-    public ServerReader(Server server, BlockingQueue<KeyValue<String, String>> blockingQueue) {
+    public ServerReader(Server server, BlockingQueue<KeyValue<SocketAddress, ByteBuffer>> blockingQueue) {
         this.server = server;
         this.blockingQueue = blockingQueue;
     }
@@ -30,10 +32,10 @@ public class ServerReader implements Reader{
     public void run() {
         while (true){
             try {
-                KeyValue<String, String> data = this.blockingQueue.take(); //blocking until non empty
+                KeyValue<SocketAddress, ByteBuffer> data = this.blockingQueue.take(); //blocking until non empty
 
-                String client = data.getKey();
-                String command = data.getValue();
+                SocketAddress client = data.getKey();
+                ByteBuffer command = data.getValue();
 
                 this.server.nioBroadcast(client, command);
             } catch (InterruptedException e) {

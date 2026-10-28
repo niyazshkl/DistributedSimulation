@@ -6,7 +6,7 @@ import util.trace.port.consensus.ProposalMade;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-@Tags({DistributedTags.CLIENT_OUT_COUPLER, DistributedTags.RMI, DistributedTags.GIPC})
+@Tags({DistributedTags.CLIENT_OUT_COUPLER, DistributedTags.RMI, DistributedTags.GIPC, DistributedTags.NIO})
 public class OutCoupler implements PropertyChangeListener {
 
     private final DefaultClient defaultClient;

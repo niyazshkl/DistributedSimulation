@@ -2,9 +2,9 @@ package server;
 
 import client.DistributedCoupler;
 import client.GIPCCoupler;
-import util.trace.port.consensus.RemoteProposeRequestReceived;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
+import util.trace.port.consensus.RemoteProposeRequestReceived;
 
 import java.beans.PropertyChangeEvent;
 

@@ -5,7 +5,7 @@ import client.DefaultClient;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
 
-@Tags({DistributedTags.CLIENT, DistributedTags.RMI, DistributedTags.GIPC})
+@Tags({DistributedTags.CLIENT, DistributedTags.RMI, DistributedTags.GIPC, DistributedTags.NIO})
 public class ClientMain {
     public static void main(String[] args){
         info(args);

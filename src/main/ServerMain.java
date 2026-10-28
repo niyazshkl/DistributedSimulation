@@ -5,7 +5,7 @@ import server.DefaultServer;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
 
-@Tags({DistributedTags.SERVER, DistributedTags.RMI, DistributedTags.GIPC})
+@Tags({DistributedTags.SERVER, DistributedTags.RMI, DistributedTags.GIPC, DistributedTags.NIO})
 public class ServerMain {
     public static void main(String[] args){
         info(args);

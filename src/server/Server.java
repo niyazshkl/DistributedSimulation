@@ -4,6 +4,8 @@ import client.DistributedCoupler;
 import client.GIPCCoupler;
 
 import java.beans.PropertyChangeEvent;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
 public interface Server {
@@ -15,5 +17,5 @@ public interface Server {
 
     void addClientNioSocketChannel(SocketChannel clientSocketChannel);
 
-    void nioBroadcast(String client, String command);
+    void nioBroadcast(SocketAddress client, ByteBuffer command);
 }

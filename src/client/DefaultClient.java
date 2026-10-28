@@ -42,7 +42,7 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-@Tags({DistributedTags.CLIENT_CONFIGURER, DistributedTags.RMI, DistributedTags.GIPC})
+@Tags({DistributedTags.CLIENT_CONFIGURER, DistributedTags.RMI, DistributedTags.GIPC, DistributedTags.NIO})
 public class DefaultClient extends Constants implements Client, SocketChannelConnectListener, SocketChannelWriteListener, SocketChannelReadListener {
 
     private String name;

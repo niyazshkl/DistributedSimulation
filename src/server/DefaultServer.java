@@ -1,7 +1,6 @@
 package server;
 
 import assignments.util.mainArgs.ServerArgsProcessor;
-
 import client.DistributedCoupler;
 import client.GIPCCoupler;
 import inputport.nio.manager.NIOManager;
@@ -12,12 +11,11 @@ import inputport.nio.manager.listeners.SocketChannelWriteListener;
 import inputport.rpc.GIPCLocateRegistry;
 import inputport.rpc.GIPCRegistry;
 import shared.Constants;
-import shared.NIOUtilities;
+import util.annotations.Tags;
 import util.interactiveMethodInvocation.IPCMechanism;
 import util.interactiveMethodInvocation.SimulationParametersControllerFactory;
-import util.trace.port.consensus.ProposalLearnedNotificationSent;
-import util.annotations.Tags;
 import util.tags.DistributedTags;
+import util.trace.port.consensus.ProposalLearnedNotificationSent;
 import util.trace.port.consensus.ProposalMade;
 import util.trace.port.consensus.RemoteProposeRequestReceived;
 import util.trace.port.nio.SocketChannelBound;
@@ -29,6 +27,7 @@ import util.trace.port.rpc.rmi.RMIRegistryLocated;
 import java.beans.PropertyChangeEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
@@ -42,7 +41,7 @@ import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-@Tags({DistributedTags.SERVER_CONFIGURER, DistributedTags.RMI, DistributedTags.GIPC})
+@Tags({DistributedTags.SERVER_CONFIGURER, DistributedTags.RMI, DistributedTags.GIPC, DistributedTags.NIO})
 public class DefaultServer extends Constants implements Server, SocketChannelAcceptListener, SocketChannelReadListener, SocketChannelWriteListener {
 
     private Map<String, DistributedCoupler> clients;
@@ -58,8 +57,8 @@ public class DefaultServer extends Constants implements Server, SocketChannelAcc
     Thread readThread;
     private boolean hasNioConnection=false;
 
-    private Map<String, SocketChannel> clientSocketChannels; //<clientAddress, socketChannel>
-    private BlockingQueue<KeyValue<String, String>> blockingQueue = new ArrayBlockingQueue<>(2_000); //large capacity
+    private Map<SocketAddress, SocketChannel> clientSocketChannels; //<clientAddress, socketChannel>
+    private BlockingQueue<KeyValue<SocketAddress, ByteBuffer>> blockingQueue = new ArrayBlockingQueue<>(2_000); //<clientAddress, command>
 
     public DefaultServer(String registryHost, int rmiRegistryPort, int gipcServerPort, int nioServerPort) {
         super(); //set tracing is done.
@@ -223,7 +222,7 @@ public class DefaultServer extends Constants implements Server, SocketChannelAcc
     @Override
     public void addClientNioSocketChannel(SocketChannel clientSocketChannel){
         try {
-            String clientAddress = clientSocketChannel.getRemoteAddress().toString();
+            SocketAddress clientAddress = clientSocketChannel.getRemoteAddress();
             this.clientSocketChannels.put(clientAddress, clientSocketChannel);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -231,13 +230,13 @@ public class DefaultServer extends Constants implements Server, SocketChannelAcc
     }
 
     @Override
-    public void nioBroadcast(String client, String command) {
-        ProposalMade.newCase(this, client, -1, command);
-        for (Map.Entry<String, SocketChannel> entry: this.clientSocketChannels.entrySet()){
-            String currentClient = entry.getKey();
+    public void nioBroadcast(SocketAddress client, ByteBuffer command) {
+        ProposalMade.newCase(this, client.toString(), -1, command);
+        for (Map.Entry<SocketAddress, SocketChannel> entry: this.clientSocketChannels.entrySet()){
+            SocketAddress currentClient = entry.getKey();
             if (!currentClient.equals(client)){
                 //broadcast here
-                nioManager.write(entry.getValue(), NIOUtilities.stringToByteBuffer(command), this);
+                nioManager.write(entry.getValue(), command, this);
             }
         }
     }
@@ -253,19 +252,12 @@ public class DefaultServer extends Constants implements Server, SocketChannelAcc
     }
 
     @Override
-    public void socketChannelRead(SocketChannel socketChannel, ByteBuffer byteBuffer, int i) {
+    public void socketChannelRead(SocketChannel socketChannel, ByteBuffer command, int i) {
         //put in a blocking collection
-            String command = NIOUtilities.byteBufferToString(byteBuffer);
-//            System.out.println(socketChannel + "<--" + command);
         try {
-            String sender = socketChannel.getRemoteAddress().toString();
-            RemoteProposeRequestReceived.newCase(this, sender, -1, command);
-
-
-            KeyValue<String, String> data = new KeyValue<>(sender, command);
-
+            RemoteProposeRequestReceived.newCase(this, "command", -1, command);
+            KeyValue<SocketAddress, ByteBuffer> data = new KeyValue<>(socketChannel.getRemoteAddress(), command);
             this.blockingQueue.add(data);
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -274,8 +266,6 @@ public class DefaultServer extends Constants implements Server, SocketChannelAcc
     @Override
     public void written(SocketChannel socketChannel, ByteBuffer byteBuffer, int i) {
         //go over each client endpoint (socketChannel) and then send it to them and they will put in their blocking collection.
-        String sentString = NIOUtilities.byteBufferToString(byteBuffer);
-        ProposalLearnedNotificationSent.newCase(this, socketChannel.toString(), -1,sentString);
-//        System.out.println(socketChannel + " {wrote: " + sentString + "} --> (sendId / i ): " + i);
+        ProposalLearnedNotificationSent.newCase(this, "command", -1,byteBuffer);
     }
 }
