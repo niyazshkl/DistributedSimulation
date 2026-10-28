@@ -164,8 +164,12 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
     }
 
 
-
+    @Override
+    public void localProcessingOnly(boolean newValue){
+        super.localProcessingOnly(newValue);
+    }
     public void send(PropertyChangeEvent propertyChangeEvent){
+        if (isLocalProcessingOnly()) return;
         RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
         if (this.getIPCMechanism()==IPCMechanism.RMI){
         try {

@@ -150,7 +150,10 @@ public class DefaultServer extends Constants implements Server, SocketChannelAcc
 
         gipcRegistry.getInputPort().addConnectionListener(this);
     }
-
+    @Override
+    public void localProcessingOnly(boolean newValue){
+        super.localProcessingOnly(newValue);
+    }
     @Override
     public void broadcast(String senderName, PropertyChangeEvent event) {
             ProposalMade.newCase(this, senderName, -1, event);
