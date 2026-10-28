@@ -4,30 +4,46 @@ import assignments.util.mainArgs.ServerArgsProcessor;
 
 import client.DistributedCoupler;
 import client.GIPCCoupler;
-import inputport.ConnectionType;
+import inputport.nio.manager.NIOManager;
+import inputport.nio.manager.NIOManagerFactory;
+import inputport.nio.manager.listeners.SocketChannelAcceptListener;
+import inputport.nio.manager.listeners.SocketChannelReadListener;
+import inputport.nio.manager.listeners.SocketChannelWriteListener;
 import inputport.rpc.GIPCLocateRegistry;
 import inputport.rpc.GIPCRegistry;
 import shared.Constants;
+import shared.NIOUtilities;
 import util.interactiveMethodInvocation.IPCMechanism;
 import util.interactiveMethodInvocation.SimulationParametersControllerFactory;
 import util.trace.port.consensus.ProposalLearnedNotificationSent;
 import util.annotations.Tags;
 import util.tags.DistributedTags;
 import util.trace.port.consensus.ProposalMade;
+import util.trace.port.consensus.RemoteProposeRequestReceived;
+import util.trace.port.nio.SocketChannelBound;
 import util.trace.port.rpc.gipc.GIPCObjectRegistered;
 import util.trace.port.rpc.gipc.GIPCRegistryCreated;
 import util.trace.port.rpc.rmi.RMIObjectRegistered;
 import util.trace.port.rpc.rmi.RMIRegistryLocated;
 
 import java.beans.PropertyChangeEvent;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+
 @Tags({DistributedTags.SERVER_CONFIGURER, DistributedTags.RMI, DistributedTags.GIPC})
-public class DefaultServer extends Constants implements Server{
+public class DefaultServer extends Constants implements Server, SocketChannelAcceptListener, SocketChannelReadListener, SocketChannelWriteListener {
 
     private Map<String, DistributedCoupler> clients;
     private Map<String, GIPCCoupler> gipcClients;
@@ -35,10 +51,17 @@ public class DefaultServer extends Constants implements Server{
     private String registryHost;
     private int rmiRegistryPort;
     private int gipcServerPort;
+    private int nioServerPort;
     private Registry rmiRegistry;
     private GIPCRegistry gipcRegistry;
+    private NIOManager nioManager;
+    Thread readThread;
+    private boolean hasNioConnection=false;
 
-    public DefaultServer(String registryHost, int rmiRegistryPort, int gipcServerPort) {
+    private Map<String, SocketChannel> clientSocketChannels; //<clientAddress, socketChannel>
+    private BlockingQueue<KeyValue<String, String>> blockingQueue = new ArrayBlockingQueue<>(2_000); //large capacity
+
+    public DefaultServer(String registryHost, int rmiRegistryPort, int gipcServerPort, int nioServerPort) {
         super(); //set tracing is done.
         this.registryHost = registryHost;
         this.rmiRegistryPort = rmiRegistryPort;
@@ -46,22 +69,19 @@ public class DefaultServer extends Constants implements Server{
         this.clients = new HashMap<>();
         this.gipcClients = new HashMap<>();
         this.relayer = new RelayerProxy(this);
+        this.nioServerPort = nioServerPort;
+        this.nioManager = NIOManagerFactory.getSingleton();
+        this.readThread = new Thread(new ServerReader(this,this.blockingQueue));
+        this.readThread.setName("Read thread");
         this.setIPCMechanism(IPCMechanism.RMI); //default start point.
-    }
-
-    public void setRegistryHost(String registryHost) {
-        this.registryHost = registryHost;
-    }
-
-    public void setRmiRegistryPort(int rmiRegistryPort) {
-        this.rmiRegistryPort = rmiRegistryPort;
     }
 
     public static void launchServer(String[] args){
         String registryHost = ServerArgsProcessor.getRegistryHost(args);
         int registryPort = ServerArgsProcessor.getRegistryPort(args);
         int gipcServerPort = ServerArgsProcessor.getGIPCServerPort(args);
-        DefaultServer defaultServer = new DefaultServer(registryHost, registryPort, gipcServerPort);
+        int nioServerPort = ServerArgsProcessor.getNIOServerPort(args);
+        DefaultServer defaultServer = new DefaultServer(registryHost, registryPort, gipcServerPort, nioServerPort);
         defaultServer.launchServer();
     }
 
@@ -69,8 +89,10 @@ public class DefaultServer extends Constants implements Server{
         this.info();
         this.rmiRegister();
         this.gipcRegister();
+        this.nioSetup();
         this.boilerPlate();
     }
+
 
     private void info() {
         System.out.println("Registry Host: " + registryHost);
@@ -130,29 +152,13 @@ public class DefaultServer extends Constants implements Server{
         gipcRegistry.getInputPort().addConnectionListener(this);
     }
 
+    @Override
     public void broadcast(String senderName, PropertyChangeEvent event) {
-
-        ProposalMade.newCase(this, senderName, -1, event);
-        if (event.getPropertyName().equals("ipc_mechanism")) {//always RMI Client proxies (this.clients)
-        for (Map.Entry<String, DistributedCoupler> entry : this.clients.entrySet()) {
-            if (!entry.getKey().equals(senderName)) {
-                ProposalLearnedNotificationSent.newCase(this, entry.getKey(), -1, event);
-
-                    //no matter what always RMI
-                try {
-                    entry.getValue().receiveChange(event);
-                } catch (RemoteException e) {
-                    throw new RuntimeException(e);
-                }
-
-            }
-        }
-        } else{
-            if (this.getIPCMechanism()==IPCMechanism.RMI){
-                for (Map.Entry<String, DistributedCoupler> entry : this.clients.entrySet()) { //RMI Client proxies (this.clients)
+            ProposalMade.newCase(this, senderName, -1, event);
+            if (event.getPropertyName().equals("ipc_mechanism")) {//always RMI Client proxies (this.clients)
+                for (Map.Entry<String, DistributedCoupler> entry : this.clients.entrySet()) {
                     if (!entry.getKey().equals(senderName)) {
                         ProposalLearnedNotificationSent.newCase(this, entry.getKey(), -1, event);
-
                         //no matter what always RMI
                         try {
                             entry.getValue().receiveChange(event);
@@ -161,26 +167,115 @@ public class DefaultServer extends Constants implements Server{
                         }
 
                     }
-            }
-        } else if (this.getIPCMechanism()==IPCMechanism.GIPC){
-                for (Map.Entry<String, GIPCCoupler> entry : this.gipcClients.entrySet()){
-                    if (!entry.getKey().equals(senderName)) {
-                        ProposalLearnedNotificationSent.newCase(this, entry.getKey(), -1, event);
-                        entry.getValue().receiveChange(event);
+                }
+            } else{
+                if (this.getIPCMechanism()==IPCMechanism.RMI){
+                    for (Map.Entry<String, DistributedCoupler> entry : this.clients.entrySet()) { //RMI Client proxies (this.clients)
+                        if (!entry.getKey().equals(senderName)) {
+                            ProposalLearnedNotificationSent.newCase(this, entry.getKey(), -1, event);
+
+                            //no matter what always RMI
+                            try {
+                                entry.getValue().receiveChange(event);
+                            } catch (RemoteException e) {
+                                throw new RuntimeException(e);
+                            }
+
+                        }
                     }
+                } else if (this.getIPCMechanism()==IPCMechanism.GIPC){
+                    for (Map.Entry<String, GIPCCoupler> entry : this.gipcClients.entrySet()){
+                        if (!entry.getKey().equals(senderName)) {
+                            ProposalLearnedNotificationSent.newCase(this, entry.getKey(), -1, event);
+                            entry.getValue().receiveChange(event);
+                        }
+                    }
+                }
+
+
             }
+
     }
 
-
-        }
-    }
-
+    @Override
     public void addClient(String name, DistributedCoupler inCoupler){
         this.clients.put(name, inCoupler); //overwrites previous incoupler of a client
     }
+    @Override
     public void addGipcClient(String name, GIPCCoupler inCoupler){
         this.gipcClients.put(name, inCoupler); //overwrites previous incoupler of a client
     }
 
 
+    private void nioSetup(){
+        try {
+            ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+            InetSocketAddress inetSocketAddress = new InetSocketAddress(nioServerPort);
+            serverSocketChannel.bind(inetSocketAddress);
+            SocketChannelBound.newCase(this, serverSocketChannel, inetSocketAddress);
+            this.clientSocketChannels = new HashMap<>();
+            this.nioManager.enableListenableAccepts(serverSocketChannel, SelectionKey.OP_READ, this); //already does nioManager.enableReads(socketChannel) upon connection.
+//            this.nioManager.addReadListener(serverSocketChannel, this);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    @Override
+    public void addClientNioSocketChannel(SocketChannel clientSocketChannel){
+        try {
+            String clientAddress = clientSocketChannel.getRemoteAddress().toString();
+            this.clientSocketChannels.put(clientAddress, clientSocketChannel);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void nioBroadcast(String client, String command) {
+        ProposalMade.newCase(this, client, -1, command);
+        for (Map.Entry<String, SocketChannel> entry: this.clientSocketChannels.entrySet()){
+            String currentClient = entry.getKey();
+            if (!currentClient.equals(client)){
+                //broadcast here
+                nioManager.write(entry.getValue(), NIOUtilities.stringToByteBuffer(command), this);
+            }
+        }
+    }
+
+    @Override
+    public void socketChannelAccepted(ServerSocketChannel serverSocketChannel, SocketChannel socketChannel) {
+        //store the client endpoint (socketChannel)
+        this.addClientNioSocketChannel(socketChannel);
+        if (!this.hasNioConnection) this.readThread.start();
+        this.hasNioConnection = true;
+//        this.nioManager.enableReads(socketChannel);
+        this.nioManager.addReadListener(socketChannel, this);
+    }
+
+    @Override
+    public void socketChannelRead(SocketChannel socketChannel, ByteBuffer byteBuffer, int i) {
+        //put in a blocking collection
+            String command = NIOUtilities.byteBufferToString(byteBuffer);
+//            System.out.println(socketChannel + "<--" + command);
+        try {
+            String sender = socketChannel.getRemoteAddress().toString();
+            RemoteProposeRequestReceived.newCase(this, sender, -1, command);
+
+
+            KeyValue<String, String> data = new KeyValue<>(sender, command);
+
+            this.blockingQueue.add(data);
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void written(SocketChannel socketChannel, ByteBuffer byteBuffer, int i) {
+        //go over each client endpoint (socketChannel) and then send it to them and they will put in their blocking collection.
+        String sentString = NIOUtilities.byteBufferToString(byteBuffer);
+        ProposalLearnedNotificationSent.newCase(this, socketChannel.toString(), -1,sentString);
+//        System.out.println(socketChannel + " {wrote: " + sentString + "} --> (sendId / i ): " + i);
+    }
 }

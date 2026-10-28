@@ -1,7 +1,6 @@
 package client.modifiedStarter;
 
 import assignments.util.inputParameters.AnAbstractSimulationParametersBean;
-import assignments.util.inputParameters.SimulationParametersListener;
 import client.Client;
 import client.Coupler;
 import graphics.HalloweenSimulation;
@@ -11,11 +10,12 @@ import util.misc.ThreadSupport;
 import util.trace.Tracer;
 import util.trace.port.PerformanceExperimentEnded;
 import util.trace.port.PerformanceExperimentStarted;
+import util.trace.trickOrTreat.LocalCommandObserved;
 
 import java.beans.PropertyChangeListener;
 
 
-public class ASimulation extends AnAbstractSimulationParametersBean implements SimulationParametersListener {
+public class ASimulation extends AnAbstractSimulationParametersBean implements Simulation {
     private final Client client;
     HalloweenCommandProcessor commandProcessor;
     protected int NUM_EXPERIMENT_COMMANDS = 500;
@@ -88,6 +88,10 @@ public class ASimulation extends AnAbstractSimulationParametersBean implements S
         }
 
         this.commandProcessor.setInputString(aCommand);
+    }
+    @Override
+    public void processSimulationCommand(String command){
+        this.commandProcessor.processCommand(command);
     }
 
     public void trace(boolean newValue) {
