@@ -22,6 +22,7 @@ public class PrintServer extends NiyazNIOUtilities implements SocketChannelAccep
     protected NIOManager nioManager = NIOManagerFactory.getSingleton();
     protected Set<SocketChannel> clients = new HashSet<>();
     protected volatile String currentString;
+    protected  String senderAddress;
     Thread delegatedThread = new Thread(()->{
         try {
             synchronized (this){
@@ -60,6 +61,14 @@ public class PrintServer extends NiyazNIOUtilities implements SocketChannelAccep
         }
 
     }
+    private static String getSenderAddress(SocketChannel aSocketChannel) {
+        try {
+            return aSocketChannel.getRemoteAddress().toString();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Override
     public void socketChannelAccepted(ServerSocketChannel aServerSocketChannel, SocketChannel aSocketChannel) {
         /*
@@ -69,7 +78,6 @@ public class PrintServer extends NiyazNIOUtilities implements SocketChannelAccep
         - need to iterate
             - long -> delegate work to local thread so selector thread doesn't wait: else causes starvation)
          */
-
         clients.add(aSocketChannel);//will use later the printer wants to echo to each client.
 
 //        this.nioManager.enableReads(aSocketChannel);
@@ -86,6 +94,7 @@ it already said that the "listenable" "will enable" and passed in READ_OP
 
     private void echoToEachClient(){
         for (SocketChannel socketChannel: clients){
+            if (getSenderAddress(socketChannel).equals(this.senderAddress)) continue; //skip the sender
             ByteBuffer converted = stringToByteBuffer(this.currentString);
             this.nioManager.write(socketChannel, converted, this);
         }
@@ -94,6 +103,7 @@ it already said that the "listenable" "will enable" and passed in READ_OP
     public void socketChannelRead(SocketChannel aSocketChannel, ByteBuffer aMessage, int aLength) {
         String aMessageString = byteBufferToString(aMessage, aLength);
         this.currentString = aMessageString;
+        this.senderAddress = getSenderAddress(aSocketChannel); //aSocketChannel is this (server) endPoint so the sender is client and receiver is server.
         System.out.println(aMessageString + "<--" + aSocketChannel);
         /*
         I think NIOManager does this internally:
