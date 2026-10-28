@@ -14,7 +14,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Scanner;
 
-public class PrintClient extends NiyazNIOUtilities implements SocketChannelConnectListener, SocketChannelWriteListener, SocketChannelReadListener {
+public class PrintClient extends NIOUtilities implements SocketChannelConnectListener, SocketChannelWriteListener, SocketChannelReadListener {
     protected NIOManager nioManager = NIOManagerFactory.getSingleton();
     protected SocketChannel socketChannel;
     protected Scanner scanner;
@@ -48,7 +48,7 @@ public class PrintClient extends NiyazNIOUtilities implements SocketChannelConne
     protected void initialize(int aServerPort) {
         try {
             this.socketChannel = SocketChannel.open();
-            InetAddress aServerAddress = InetAddress.getByName(NiyazNIOUtilities.CLIENT_HOST_NAME);
+            InetAddress aServerAddress = InetAddress.getByName(NIOUtilities.CLIENT_HOST_NAME);
             this.nioManager.connect(this.socketChannel, aServerAddress, aServerPort, 0, new SocketChannelConnectListener[]{this});
         } catch (IOException e) {
             e.printStackTrace();
@@ -87,7 +87,7 @@ public class PrintClient extends NiyazNIOUtilities implements SocketChannelConne
         aWriteBuffer.flip(); called after writing into buffer to allow byteBUffer reuse in both read/write
         Then idk what else to put here I think nothing?
  */
-        String sentString = NiyazNIOUtilities.byteBufferToString(aWriteBuffer, aWriteBuffer.limit());
+        String sentString = NIOUtilities.byteBufferToString(aWriteBuffer);
         System.out.println(socketChannel + "-->" + sentString + "sendId: " + sendId);
     }
 
@@ -102,7 +102,7 @@ public class PrintClient extends NiyazNIOUtilities implements SocketChannelConne
 
 //      byteBuffer.clear(); //I think this is done by the nioManager internally
 
-        String receivedString = NiyazNIOUtilities.byteBufferToString(byteBuffer, aLength);
+        String receivedString = NIOUtilities.byteBufferToString(byteBuffer);
         System.out.println(receivedString + "<--" + socketChannel);
     }
 }

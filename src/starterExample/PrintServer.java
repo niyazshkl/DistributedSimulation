@@ -18,7 +18,7 @@ import java.nio.channels.SocketChannel;
 import java.util.HashSet;
 import java.util.Set;
 
-public class PrintServer extends NiyazNIOUtilities implements SocketChannelAcceptListener, SocketChannelReadListener, SocketChannelWriteListener {
+public class PrintServer extends NIOUtilities implements SocketChannelAcceptListener, SocketChannelReadListener, SocketChannelWriteListener {
     protected NIOManager nioManager = NIOManagerFactory.getSingleton();
     protected Set<SocketChannel> clients = new HashSet<>();
     protected volatile String currentString;
@@ -101,7 +101,7 @@ it already said that the "listenable" "will enable" and passed in READ_OP
     }
     @Override
     public void socketChannelRead(SocketChannel aSocketChannel, ByteBuffer aMessage, int aLength) {
-        String aMessageString = byteBufferToString(aMessage, aLength);
+        String aMessageString = byteBufferToString(aMessage);
         this.currentString = aMessageString;
         this.senderAddress = getSenderAddress(aSocketChannel); //aSocketChannel is this (server) endPoint so the sender is client and receiver is server.
         System.out.println(aMessageString + "<--" + aSocketChannel);
@@ -126,7 +126,7 @@ it already said that the "listenable" "will enable" and passed in READ_OP
     @Override
     public void written(SocketChannel socketChannel, ByteBuffer byteBuffer, int i) {
 //        byteBuffer.clear(); // done internally by nioManager
-        String sentString = byteBufferToString(byteBuffer, byteBuffer.limit());
+        String sentString = byteBufferToString(byteBuffer);
         System.out.println(socketChannel + " {wrote: " + sentString + "} --> (sendId / i ): " + i);
    }
 }
