@@ -1,7 +1,8 @@
 package client.modifiedStarter;
 
+import assignments.util.inputParameters.SimulationParametersBean;
 import assignments.util.inputParameters.SimulationParametersListener;
 
 public interface Simulation extends SimulationParametersListener {
-    void processSimulationCommand(String command);
+    void atomicBroadcast(boolean isBroadcast);
 }

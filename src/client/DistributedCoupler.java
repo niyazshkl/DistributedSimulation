@@ -11,4 +11,5 @@ import java.rmi.RemoteException;
 @Tags({DistributedTags.CLIENT_REMOTE_INTERFACE, DistributedTags.RMI})
 public interface DistributedCoupler extends Remote, Serializable {
     void receiveChange(PropertyChangeEvent anEvent) throws RemoteException;
+    void receiveProposalAcceptRequest(PropertyChangeEvent anEvent) throws RemoteException;
 }

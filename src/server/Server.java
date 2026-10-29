@@ -2,6 +2,7 @@ package server;
 
 import client.DistributedCoupler;
 import client.GIPCCoupler;
+import consensus.ProposalFeedbackKind;
 
 import java.beans.PropertyChangeEvent;
 import java.net.SocketAddress;
@@ -16,6 +17,8 @@ public interface Server {
     void addGipcClient(String name, GIPCCoupler inCoupler);
 
     void addClientNioSocketChannel(SocketChannel clientSocketChannel);
+
+    void handleProposalAcceptRequestResponse(String sender, PropertyChangeEvent anEvent, ProposalFeedbackKind response);
 
     void nioBroadcast(SocketAddress client, ByteBuffer command);
 }

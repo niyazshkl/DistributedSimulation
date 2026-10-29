@@ -2,8 +2,8 @@ package client;
 
 import assignments.util.inputParameters.SimulationParametersBean;
 
-public interface Client extends SimulationParametersBean {
-    void sendCommand(String command);
+import java.beans.PropertyChangeEvent;
 
-    void processSimulationCommand(String command);
+public interface Client extends SimulationParametersBean {
+    void handleProposalAcceptRequest(PropertyChangeEvent anEvent);
 }

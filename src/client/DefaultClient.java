@@ -3,6 +3,7 @@ package client;
 import assignments.util.mainArgs.ClientArgsProcessor;
 import client.modifiedStarter.ASimulation;
 import client.modifiedStarter.Simulation;
+import consensus.ProposalFeedbackKind;
 import inputport.nio.manager.NIOManager;
 import inputport.nio.manager.NIOManagerFactory;
 import inputport.nio.manager.listeners.SocketChannelConnectListener;
@@ -15,15 +16,13 @@ import server.GIPCRelayer;
 import shared.Constants;
 import shared.NIOUtilities;
 import util.annotations.Tags;
+import util.interactiveMethodInvocation.ConsensusAlgorithm;
 import util.interactiveMethodInvocation.IPCMechanism;
 import util.interactiveMethodInvocation.SimulationParametersControllerFactory;
 import util.tags.DistributedTags;
 import util.trace.port.PerformanceExperimentEnded;
 import util.trace.port.PerformanceExperimentStarted;
-import util.trace.port.consensus.ProposalLearnedNotificationSent;
-import util.trace.port.consensus.ProposalMade;
-import util.trace.port.consensus.RemoteProposeRequestReceived;
-import util.trace.port.consensus.RemoteProposeRequestSent;
+import util.trace.port.consensus.*;
 import util.trace.port.rpc.gipc.GIPCObjectLookedUp;
 import util.trace.port.rpc.gipc.GIPCRegistryLocated;
 import util.trace.port.rpc.rmi.RMIObjectLookedUp;
@@ -44,7 +43,7 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-@Tags({DistributedTags.CLIENT_CONFIGURER, DistributedTags.RMI, DistributedTags.GIPC, DistributedTags.NIO})
+@Tags({DistributedTags.CLIENT_CONFIGURER, DistributedTags.RMI, DistributedTags.GIPC, DistributedTags.NIO,DistributedTags.ATOMIC_BROADCAST, DistributedTags.TWO_PHASE_COMMIT})
 public class DefaultClient extends Constants implements Client, SocketChannelConnectListener, SocketChannelWriteListener, SocketChannelReadListener {
 
     private String name;
@@ -85,7 +84,7 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
         this.nioServerPort = nioServerPort;
         this.nioManager = NIOManagerFactory.getSingleton();
         this.commands = new ArrayBlockingQueue<>(2_000);
-        this.setIPCMechanism(IPCMechanism.RMI); //default start point.
+        this.ipcMechanism = IPCMechanism.RMI;//default start point.
     }
 
     public static void initializeClient(String[] args) {
@@ -173,28 +172,29 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
     }
     public void send(PropertyChangeEvent propertyChangeEvent){
         if (isLocalProcessingOnly()) return;
-        RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
         if (this.getIPCMechanism()==IPCMechanism.RMI){
         try {
-            this.rmiServerProxy.send(this.name, propertyChangeEvent);
+            RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
+            this.rmiServerProxy.receive(this.name, propertyChangeEvent);
         } catch (RemoteException e) {
             throw new RuntimeException(e);
         }
         }
         else if (this.getIPCMechanism()==IPCMechanism.GIPC){
-            this.gipcServerProxy.send(this.name, propertyChangeEvent);
+            RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
+            this.gipcServerProxy.receive(this.name, propertyChangeEvent);
         } else if (this.getIPCMechanism()==IPCMechanism.NIO) {
+            RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
             this.nioManager.write(this.socketChannel, NIOUtilities.stringToByteBuffer(propertyChangeEvent.getNewValue().toString()), this);
         }
     }
-    @Override
+
     public void sendCommand(String command){
             ProposalMade.newCase(this, this.name, -1, command);
             this.nioManager.write(this.socketChannel, NIOUtilities.stringToByteBuffer(command), this);
     }
     @Override
-    public void processSimulationCommand(String command){
-        this.simulation.processSimulationCommand(command);
+    public void simulationCommand(String command){this.simulation.simulationCommand(command);
     }
     @Override
     public void experimentInput() {
@@ -214,14 +214,14 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
     }
     @Override
     public void ipcMechanism(IPCMechanism newValue){
-        ProposalMade.newCase(this, "ipc_mechanism", -1.0F, newValue);
         var oldValue = getIPCMechanism();
         this.setIPCMechanism(newValue);
         if (isBroadcastMetaState()){// if the broadcast is set active
             //broadcast IpcMechanism replica object always using rmiProxy (never any other IPC Mechanism).
             PropertyChangeEvent propertyChangeEvent = new PropertyChangeEvent(this, "ipc_mechanism",oldValue,getIPCMechanism());
             try {
-                this.rmiServerProxy.send(name, propertyChangeEvent);
+                RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
+                this.rmiServerProxy.receive(name, propertyChangeEvent);
             } catch (RemoteException e) {
                 throw new RuntimeException(e);
             }
@@ -255,4 +255,68 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
         String sentString = NIOUtilities.byteBufferToString(byteBuffer);
         ProposalLearnedNotificationSent.newCase(this, socketChannel.toString(), -1,sentString);
     }
+
+    @Override
+    public void setAtomicBroadcast(Boolean atomicBroadcast){
+        ProposedStateSet.newCase(this, "broadcast_mode", -1.0F, atomicBroadcast);
+        if (atomicBroadcast!=null){
+        this.atomicBroadcast = atomicBroadcast;
+        this.simulation.atomicBroadcast(atomicBroadcast);
+        }
+    }
+
+    @Override
+    public synchronized void setIPCMechanism(IPCMechanism newValue) {
+        ProposedStateSet.newCase(this, "ipc_mechanism", -1.0F, newValue);
+        if (newValue!=null){
+        this.ipcMechanism = newValue;
+        }
+    }
+
+
+    @Override
+    public void atomicBroadcast(boolean newValue){
+        boolean oldValue = isAtomicBroadcast();
+        setAtomicBroadcast(newValue);
+//        super.atomicBroadcast(newValue);
+        if (isBroadcastMetaState()){// if the broadcast is set active
+            //broadcast meta state replica object always using rmiProxy (never any other IPC Mechanism).
+            PropertyChangeEvent propertyChangeEvent = new PropertyChangeEvent(this, "broadcast_mode",oldValue,isAtomicBroadcast());
+            try {
+                RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
+                this.rmiServerProxy.receive(name, propertyChangeEvent);
+            } catch (RemoteException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    @Override
+    public void consensusAlgorithm(ConsensusAlgorithm newValue) {
+        this.setConsensusAlgorithm(newValue);
+        if (newValue==ConsensusAlgorithm.CENTRALIZED_SYNCHRONOUS) atomicBroadcast(true);
+    }
+
+    @Override
+    public void handleProposalAcceptRequest(PropertyChangeEvent anEvent) {
+        /*
+        Some algorithm to determine response: for now just a dummy one is to always accept
+        Send it back to the server using relayer proxy (RMI Only)
+         */
+        ProposalFeedbackKind response = determineProposalAcceptRequestReponse(anEvent);
+        sendProposalAcceptResponse(anEvent, response);
+    }
+
+    private void sendProposalAcceptResponse(PropertyChangeEvent anEvent, ProposalFeedbackKind response) {
+        //according to instructions, always done using RMI
+        try {
+            ProposalAcceptRequestSent.newCase(this, "ProposalAcceptRequest", -1, anEvent);
+            this.rmiServerProxy.receiveProposalAcceptResponse(this.name, anEvent, response);
+        } catch (RemoteException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private ProposalFeedbackKind determineProposalAcceptRequestReponse(PropertyChangeEvent anEvent){return ProposalFeedbackKind.SUCCESS;}
+
 }

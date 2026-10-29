@@ -35,7 +35,7 @@ public class ClientReader implements Reader {
             try {
                 String command = this.commands.take(); //blocking until non empty
                 LocalCommandObserved.newCase(this, command);
-                this.client.processSimulationCommand(command);
+                this.client.simulationCommand(command);
             } catch (InterruptedException e) {
                 System.exit(-1);
             }

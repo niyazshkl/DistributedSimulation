@@ -6,11 +6,7 @@ import client.Coupler;
 import graphics.HalloweenSimulation;
 import main.BeauAndersonFinalProject;
 import stringProcessors.HalloweenCommandProcessor;
-import util.misc.ThreadSupport;
 import util.trace.Tracer;
-import util.trace.port.PerformanceExperimentEnded;
-import util.trace.port.PerformanceExperimentStarted;
-import util.trace.trickOrTreat.LocalCommandObserved;
 
 import java.beans.PropertyChangeListener;
 
@@ -77,16 +73,13 @@ public class ASimulation extends AnAbstractSimulationParametersBean implements S
     public void simulationCommand(String aCommand) {
         this.commandProcessor.setInputString(aCommand);
     }
-    @Override
-    public void processSimulationCommand(String command){
-        this.commandProcessor.processCommand(command);
-    }
 
     public void trace(boolean newValue) {
         super.trace(newValue);
         Tracer.showInfo(this.isTrace());
     }
 
+    @Override
     public void atomicBroadcast(boolean newValue) {
         super.atomicBroadcast(newValue);
         this.commandProcessor.setConnectedToSimulation(!this.isAtomicBroadcast());

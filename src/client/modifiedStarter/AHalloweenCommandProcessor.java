@@ -517,7 +517,6 @@ public class AHalloweenCommandProcessor implements HalloweenCommandProcessor, Di
 
         if (checkWithAllVetoers(inputEvent)) {
             if (isConnectedToSimulation()) {
-                System.out.println("CHECK WITH ALL VETORERS!! & ConnectedTosimulation!");
                 processCommand(newVal); // changes inputString
             }
             NotifiedPropertyChangeEvent.newCase(this, inputEvent, listeners.toArray(emptyPropertyChangeListenerArray));
@@ -539,6 +538,7 @@ public class AHalloweenCommandProcessor implements HalloweenCommandProcessor, Di
     {
         CommandSubmitted.newCase(this, newInputString);
         ProposedStateSet.newCase(this, this.toString(), -1, newInputString);
+        if (newInputString==null) newInputString = "";
         inputString = newInputString;
         if (MyHalloweenSim == null)
             return;

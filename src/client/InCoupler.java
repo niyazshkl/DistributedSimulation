@@ -4,13 +4,14 @@ import client.modifiedStarter.DistributedCommandProcessor;
 import util.annotations.Tags;
 import util.interactiveMethodInvocation.IPCMechanism;
 import util.tags.DistributedTags;
+import util.trace.port.consensus.ProposalAcceptRequestReceived;
 import util.trace.port.consensus.ProposalLearnedNotificationReceived;
 import util.trace.trickOrTreat.LocalCommandObserved;
 
 import java.beans.PropertyChangeEvent;
 import java.rmi.RemoteException;
 
-@Tags({DistributedTags.CLIENT_REMOTE_OBJECT, DistributedTags.RMI, DistributedTags.GIPC})
+@Tags({DistributedTags.CLIENT_REMOTE_OBJECT, DistributedTags.RMI, DistributedTags.GIPC,DistributedTags.ATOMIC_BROADCAST, DistributedTags.TWO_PHASE_COMMIT})
 public class InCoupler implements Coupler, GIPCCoupler, DistributedCoupler { //client proxy will be called
 
     DistributedCommandProcessor observingProcessor;
@@ -31,21 +32,29 @@ public class InCoupler implements Coupler, GIPCCoupler, DistributedCoupler { //c
         //have to account for either the IPC is RMI/GIPC and if the propertyName is ipc_mehanism itself.
         String propertyName = anEvent.getPropertyName();
         if (propertyName.equals("InputString")){
-        String newValue = (String) anEvent.getNewValue();
-        LocalCommandObserved.newCase(this, newValue);
-        try {
-            observingProcessor.processCommand(newValue);
-        } catch (RemoteException e) {
-            throw new RuntimeException(e);
-        }
+            String newValue = (String) anEvent.getNewValue();
+            LocalCommandObserved.newCase(this, newValue);
+            try {
+                observingProcessor.processCommand(newValue);
+            } catch (RemoteException e) {
+                throw new RuntimeException(e);
+            }
         } else if (propertyName.equals("ipc_mechanism")){
             IPCMechanism newValue =
                     (IPCMechanism) anEvent.getNewValue();
             this.client.setIPCMechanism(newValue);
+        } else if (propertyName.equals("broadcast_mode")){
+            Boolean atomicBroadcast = (Boolean) anEvent.getNewValue();
+            this.client.setAtomicBroadcast(atomicBroadcast);
         }
         //what if the received thing is ipc_mechanism? we need to set it here also
     }
 
+    @Override
+    public void receiveProposalAcceptRequest(PropertyChangeEvent anEvent) throws RemoteException {
+        ProposalAcceptRequestReceived.newCase(this, anEvent.getPropertyName(), -1, anEvent);
+        this.client.handleProposalAcceptRequest(anEvent);
+    }
 
 
 }
