@@ -224,10 +224,19 @@ public class DefaultServer extends Constants implements Server, SocketChannelAcc
         }
     }
 
+    public void smallDelay(int seconds){
+        try {
+            Thread.sleep(seconds*1000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Override
     public void written(SocketChannel socketChannel, ByteBuffer byteBuffer, int i) {
         //go over each client endpoint (socketChannel) and then send it to them and they will put in their blocking collection.
         ProposalLearnedNotificationSent.newCase(this, "command", -1,byteBuffer);
+        smallDelay(5);
     }
 
     private void nioBroadcast(PropertyChangeEvent event, TraceableInfo trace) {
@@ -315,8 +324,10 @@ public class DefaultServer extends Constants implements Server, SocketChannelAcc
     private void printAppropriateTrace(PropertyChangeEvent event, TraceableInfo trace) {
         if (trace instanceof ProposalLearnedNotificationSent){
             ProposalLearnedNotificationSent.newCase(this, "ProposalLearnedNotification", -1, event);
+            smallDelay(5);
         } else if (trace instanceof ProposalAcceptRequestSent){
             ProposalAcceptRequestSent.newCase(this, "ProposalAcceptRequest", -1, event);
+            smallDelay(5);
         }
     }
     private ProposalAcceptRequestSent aProposalAcceptRequestSent(){
@@ -371,6 +382,7 @@ public class DefaultServer extends Constants implements Server, SocketChannelAcc
         //ProposalAcceptedNotification
         //straight forward, just like broadcast but the difference is sent to ALL because the sender also did not update!
         ProposalAcceptedNotificationSent.newCase(this, anEvent.getPropertyName(), -1, anEvent, ProposalFeedbackKind.SUCCESS);
+        smallDelay(5);
         this.doBroadcast(sender, anEvent, aProposalAcceptRequestSent()); //automatically does based on IPC Mechanism
     }
 

@@ -170,11 +170,19 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
     public void localProcessingOnly(boolean newValue){
         super.localProcessingOnly(newValue);
     }
+    private void smallDelay(int seconds){
+        try {
+            Thread.sleep(seconds*1000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
     public void send(PropertyChangeEvent propertyChangeEvent){
         if (isLocalProcessingOnly()) return;
         if (this.getIPCMechanism()==IPCMechanism.RMI){
         try {
             RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
+            smallDelay(5);
             this.rmiServerProxy.receive(this.name, propertyChangeEvent);
         } catch (RemoteException e) {
             throw new RuntimeException(e);
@@ -182,9 +190,11 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
         }
         else if (this.getIPCMechanism()==IPCMechanism.GIPC){
             RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
+            smallDelay(5);
             this.gipcServerProxy.receive(this.name, propertyChangeEvent);
         } else if (this.getIPCMechanism()==IPCMechanism.NIO) {
             RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
+            smallDelay(5);
             this.nioManager.write(this.socketChannel, NIOUtilities.stringToByteBuffer(propertyChangeEvent.getNewValue().toString()), this);
         }
     }
@@ -221,6 +231,7 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
             PropertyChangeEvent propertyChangeEvent = new PropertyChangeEvent(this, "ipc_mechanism",oldValue,getIPCMechanism());
             try {
                 RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
+                smallDelay(5);
                 this.rmiServerProxy.receive(name, propertyChangeEvent);
             } catch (RemoteException e) {
                 throw new RuntimeException(e);
@@ -254,6 +265,7 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
     public void written(SocketChannel socketChannel, ByteBuffer byteBuffer, int sendId) {
         String sentString = NIOUtilities.byteBufferToString(byteBuffer);
         ProposalLearnedNotificationSent.newCase(this, socketChannel.toString(), -1,sentString);
+        smallDelay(5);
     }
 
     @Override
@@ -284,6 +296,7 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
             PropertyChangeEvent propertyChangeEvent = new PropertyChangeEvent(this, "broadcast_mode",oldValue,isAtomicBroadcast());
             try {
                 RemoteProposeRequestSent.newCase(this, this.name, -1, propertyChangeEvent);
+                smallDelay(5);
                 this.rmiServerProxy.receive(name, propertyChangeEvent);
             } catch (RemoteException e) {
                 throw new RuntimeException(e);
@@ -311,6 +324,7 @@ public class DefaultClient extends Constants implements Client, SocketChannelCon
         //according to instructions, always done using RMI
         try {
             ProposalAcceptRequestSent.newCase(this, "ProposalAcceptRequest", -1, anEvent);
+            smallDelay(5);
             this.rmiServerProxy.receiveProposalAcceptResponse(this.name, anEvent, response);
         } catch (RemoteException e) {
             throw new RuntimeException(e);
